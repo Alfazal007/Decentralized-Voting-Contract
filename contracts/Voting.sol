@@ -6,14 +6,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Voting is Ownable {
     // this is shared resource
-    enum FreshJuiceSize {
+    enum PersonType {
         ADMIN,
         VOTERS
     }
 
     // the type of person voter or admin
     struct Person {
-        FreshJuiceSize typeOfPerson;
+        PersonType typeOfPerson;
         address person;
     }
 
@@ -42,7 +42,7 @@ contract Voting is Ownable {
             return;
         }
         adminMapping[newAdmin] = true;
-        admins.push(Person(FreshJuiceSize.ADMIN, newAdmin));
+        admins.push(Person(PersonType.ADMIN, newAdmin));
     }
 
     function hasAdmin(address adminToBeFound) public view returns (bool) {
@@ -50,20 +50,18 @@ contract Voting is Ownable {
     }
 
     function addVoter(address newVoter) public onlyOwner {
-        if (hasVoter(newVoter) || hasAdmin(newVoter)) {
+        if (hasVoter(newVoter) || hasAdmin(newVoter) || newVoter == ownerAddress) {
             return;
         }
         voterMapping[newVoter] = true;
-        voters.push(Person(FreshJuiceSize.VOTERS, newVoter));
+        voters.push(Person(PersonType.VOTERS, newVoter));
     }
 
     function hasVoter(address voterToBeFound) public view returns (bool) {
         return voterMapping[voterToBeFound] == true;
     }
 
-    function hasCandidates(
-        address candidateToBeFound
-    ) public view returns (bool) {
+    function hasCandidates(address candidateToBeFound) public view returns (bool) {
         return candidatesToVoters[candidateToBeFound] == 1;
     }
 
@@ -104,6 +102,9 @@ contract Voting is Ownable {
         if (candidatesAddingStarted == true) {
             return;
         }
+        if (candidatesArray.length == 0) {
+            return;
+        }
         votingStarted = true;
     }
 
@@ -119,13 +120,13 @@ contract Voting is Ownable {
         if (voterMapping[msg.sender] == false) {
             return;
         }
-        voterMapping[msg.sender] = false;
+        voterMapping[msg.sender] = true;
         candidatesToVoters[candidate]++;
     }
 
     // end voting -- admins
     function endVoting() public {
-        if (hasAdmin(msg.sender) != true) {
+        if (hasAdmin(msg.sender) != true || candidatesAddingStarted == true) {
             return;
         }
         votingStarted = false;
@@ -137,7 +138,7 @@ contract Voting is Ownable {
     function declareWinner() public returns (address, uint256) {
         address winner = address(0);
         uint256 votes = 0;
-        if (votingStarted == true) {
+        if (votingStarted == true || candidatesAddingStarted == true) {
             return (winner, votes);
         }
 
@@ -149,8 +150,16 @@ contract Voting is Ownable {
             }
             delete candidatesToVoters[curCandidate];
         }
+        for(uint256 i = 0; i < voters.length; i++) {
+            delete voterMapping[voters[i].person];
+        }
         delete voters;
         delete candidatesArray;
+        // reset admins map and array
+        for(uint256 i = 0; i < admins.length; i++) {
+            delete adminMapping[admins[i].person];
+        }
+        delete admins;
         return (winner, votes);
     }
 }
