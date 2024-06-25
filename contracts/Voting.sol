@@ -18,12 +18,12 @@ contract Voting is Ownable {
     }
 
     address immutable ownerAddress;
-    bool voingStarted;
+    bool votingStarted;
     bool candidatesAddingStarted;
 
     constructor() Ownable(msg.sender) {
         ownerAddress = msg.sender;
-        voingStarted = false;
+        votingStarted = false;
         candidatesAddingStarted = false;
     }
 
@@ -104,12 +104,12 @@ contract Voting is Ownable {
         if (candidatesAddingStarted == true) {
             return;
         }
-        voingStarted = true;
+        votingStarted = true;
     }
 
     // cast a vote -- voters
     function castVote(address candidate) public {
-        if (voingStarted == false) {
+        if (votingStarted == false) {
             return;
         }
         if (hasCandidates(candidate) == false) {
@@ -128,7 +128,7 @@ contract Voting is Ownable {
         if (hasAdmin(msg.sender) != true) {
             return;
         }
-        voingStarted = false;
+        votingStarted = false;
     }
 
     // winner declaration
@@ -137,7 +137,7 @@ contract Voting is Ownable {
     function declareWinner() public returns (address, uint256) {
         address winner = address(0);
         uint256 votes = 0;
-        if (voingStarted == true) {
+        if (votingStarted == true) {
             return (winner, votes);
         }
 
@@ -149,8 +149,8 @@ contract Voting is Ownable {
             }
             delete candidatesToVoters[curCandidate];
         }
-        voters = new Person[](0);
-        candidatesArray = new address[](0);
+        delete voters;
+        delete candidatesArray;
         return (winner, votes);
     }
 }
