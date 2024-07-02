@@ -4,6 +4,18 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+error IsOwner_Or_AlreadyAnAdmin();
+error AlreadyVoter_Or_IsAdmin_Or_IsOwner();
+error Candidates_Cannot_Be_Added_Yet();
+error Not_Admin();
+error Already_A_Candidate();
+error No_Candidate();
+error Voting_Not_Started();
+error Not_A_Candidate();
+error Already_Voted();
+error Not_Admin_Or_Candidates_Still_Adding();
+error StillVoting_Or_Candidates_Still_Adding();
+
 contract Voting is Ownable {
     // this is shared resource
     enum PersonType {
@@ -18,8 +30,8 @@ contract Voting is Ownable {
     }
 
     address immutable ownerAddress;
-    bool votingStarted;
-    bool candidatesAddingStarted;
+    bool public votingStarted;
+    bool public candidatesAddingStarted;
 
     constructor() Ownable(msg.sender) {
         ownerAddress = msg.sender;
@@ -39,7 +51,7 @@ contract Voting is Ownable {
 
     function addAdmin(address newAdmin) public onlyOwner {
         if (hasAdmin(newAdmin) == true || newAdmin == ownerAddress) {
-            return;
+            revert IsOwner_Or_AlreadyAnAdmin();
         }
         adminMapping[newAdmin] = true;
         admins.push(Person(PersonType.ADMIN, newAdmin));
@@ -50,8 +62,10 @@ contract Voting is Ownable {
     }
 
     function addVoter(address newVoter) public onlyOwner {
-        if (hasVoter(newVoter) || hasAdmin(newVoter) || newVoter == ownerAddress) {
-            return;
+        if (
+            hasVoter(newVoter) || hasAdmin(newVoter) || newVoter == ownerAddress
+        ) {
+            revert AlreadyVoter_Or_IsAdmin_Or_IsOwner();
         }
         voterMapping[newVoter] = true;
         voters.push(Person(PersonType.VOTERS, newVoter));
@@ -61,7 +75,9 @@ contract Voting is Ownable {
         return voterMapping[voterToBeFound] == true;
     }
 
-    function hasCandidates(address candidateToBeFound) public view returns (bool) {
+    function hasCandidates(
+        address candidateToBeFound
+    ) public view returns (bool) {
         return candidatesToVoters[candidateToBeFound] == 1;
     }
 
@@ -75,13 +91,13 @@ contract Voting is Ownable {
     // add candidates -- admins
     function addCandidates(address newCandidate) public {
         if (candidatesAddingStarted == false) {
-            return;
+            revert Candidates_Cannot_Be_Added_Yet();
         }
         if (hasAdmin(msg.sender) != true) {
-            return;
+            revert Not_Admin();
         }
         if (hasCandidates(newCandidate) == true) {
-            return;
+            revert Already_A_Candidate();
         }
         candidatesToVoters[newCandidate] = 1;
         candidatesArray.push(newCandidate);
@@ -97,13 +113,13 @@ contract Voting is Ownable {
     // start voting -- admins
     function startVoting() public {
         if (hasAdmin(msg.sender) != true) {
-            return;
+            revert Not_Admin();
         }
         if (candidatesAddingStarted == true) {
-            return;
+            revert Candidates_Cannot_Be_Added_Yet();
         }
         if (candidatesArray.length == 0) {
-            return;
+            revert No_Candidate();
         }
         votingStarted = true;
     }
@@ -111,14 +127,14 @@ contract Voting is Ownable {
     // cast a vote -- voters
     function castVote(address candidate) public {
         if (votingStarted == false) {
-            return;
+            revert Voting_Not_Started();
         }
         if (hasCandidates(candidate) == false) {
-            return;
+            revert Not_A_Candidate();
         }
         // has already voted
         if (voterMapping[msg.sender] == false) {
-            return;
+            revert Already_Voted();
         }
         voterMapping[msg.sender] = true;
         candidatesToVoters[candidate]++;
@@ -127,7 +143,7 @@ contract Voting is Ownable {
     // end voting -- admins
     function endVoting() public {
         if (hasAdmin(msg.sender) != true || candidatesAddingStarted == true) {
-            return;
+            revert Not_Admin_Or_Candidates_Still_Adding();
         }
         votingStarted = false;
     }
@@ -139,7 +155,7 @@ contract Voting is Ownable {
         address winner = address(0);
         uint256 votes = 0;
         if (votingStarted == true || candidatesAddingStarted == true) {
-            return (winner, votes);
+            revert StillVoting_Or_Candidates_Still_Adding();
         }
 
         for (uint256 i = 0; i < candidatesArray.length; i++) {
@@ -150,13 +166,13 @@ contract Voting is Ownable {
             }
             delete candidatesToVoters[curCandidate];
         }
-        for(uint256 i = 0; i < voters.length; i++) {
+        for (uint256 i = 0; i < voters.length; i++) {
             delete voterMapping[voters[i].person];
         }
         delete voters;
         delete candidatesArray;
         // reset admins map and array
-        for(uint256 i = 0; i < admins.length; i++) {
+        for (uint256 i = 0; i < admins.length; i++) {
             delete adminMapping[admins[i].person];
         }
         delete admins;
